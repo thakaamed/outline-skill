@@ -1,0 +1,9 @@
+# Credentials — never commit
+*.env
+!.env.example
+outline.env
+credentials/
+
+# OS
+.DS_Store
+*.swp
