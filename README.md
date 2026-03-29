@@ -11,9 +11,10 @@ Gives any OpenClaw agent a complete Outline wiki interface via CLI:
 - Read, create, update, move, archive, delete documents
 - Navigate collections and document trees
 - Manage shares, stars, comments, templates
+- **Document versioning** — standardized version tables with `version-init` / `version-bump`
 - Audit log and revision history
 
-**35+ commands** covering the full Outline REST API.
+**40+ commands** covering the full Outline REST API.
 
 ## Quick Install
 
@@ -64,9 +65,10 @@ outline-skill/
 ├── README.md                       # This file
 ├── .env.example                    # Credentials template
 ├── scripts/
-│   ├── outline.sh                  # Main CLI (35+ commands)
+│   ├── outline.sh                  # Main CLI (40+ commands)
 │   └── install.sh                  # One-command installer
 └── templates/
+    ├── versioned-document.md       # Generic versioned doc template
     └── team-member-status.md       # Living status doc template
 ```
 
@@ -147,12 +149,19 @@ bash "$SCRIPT" events --limit 20
 | `template-get <id>` | Get template content |
 | `template-create <title> <coll-id> [file]` | Create template |
 
+### Document Versioning
+| Command | Description |
+|---------|-------------|
+| `version-history <doc-id>` | Show version table inside a document |
+| `version-init <doc-id> [author]` | Add version table (v1.0.0) to an unversioned doc |
+| `version-bump <doc-id> <major\|minor\|patch> <summary> [author]` | Bump version + record change |
+
 ### Users & Activity
 | Command | Description |
 |---------|-------------|
 | `users` | List workspace users |
 | `events [doc-id] [--limit N] [--name EVENT]` | Audit log |
-| `revisions <doc-id> [limit]` | Revision history |
+| `revisions <doc-id> [limit]` | Server-side revision history |
 | `revision-get <rev-id> <doc-id>` | Read a specific revision |
 
 ## License

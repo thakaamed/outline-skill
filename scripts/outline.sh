@@ -701,6 +701,179 @@ else:
 "
     ;;
 
+  # ─── VERSIONING ─────────────────────────────────────────────────────
+
+  version-history)
+    ID="${1:?Usage: outline.sh version-history <doc-id>}"
+    api "documents.info" "{\"id\": \"$ID\"}" \
+      | python3 -c "
+import sys, json, re
+
+d = json.load(sys.stdin).get('data', {})
+text = d.get('text', '')
+title = d.get('title', '')
+
+# Extract the version table
+table_pattern = re.compile(
+  r'##\s+(?:📋\s*)?Document Version History\s*\n+(\|[^\n]+\|\n\|[-| :]+\|\n(?:\|[^\n]+\|\n?)*)',
+  re.IGNORECASE
+)
+match = table_pattern.search(text)
+
+print(f'Document: {title}')
+print()
+if match:
+  print(match.group(0).strip())
+else:
+  print('No version table found. Use version-init to add one.')
+"
+    ;;
+
+  version-init)
+    ID="${1:?Usage: outline.sh version-init <doc-id> [author]}"
+    AUTHOR="${2:-Unknown}"
+    TODAY=$(date -u +%Y-%m-%d)
+
+    # Fetch doc
+    DOC_JSON=$(api "documents.info" "{\"id\": \"$ID\"}")
+    TITLE=$(echo "$DOC_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('title',''))")
+    CURRENT_TEXT=$(echo "$DOC_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('text',''))")
+
+    # Check if version table already exists
+    HAS_TABLE=$(echo "$CURRENT_TEXT" | python3 -c "
+import sys, re
+text = sys.stdin.read()
+m = re.search(r'##\s+(?:📋\s*)?Document Version History', text, re.IGNORECASE)
+print('yes' if m else 'no')
+")
+    if [[ "$HAS_TABLE" == "yes" ]]; then
+      echo "Version table already exists in: $TITLE" >&2
+      echo "Use version-bump to add a new entry."
+      exit 0
+    fi
+
+    # Prepend version table after the first heading (or at the top if none)
+    NEW_TEXT=$(python3 -c "
+import sys, re
+
+text = sys.argv[1]
+author = sys.argv[2]
+today = sys.argv[3]
+
+version_block = '''
+---
+
+## 📋 Document Version History
+
+| Version | Date | Author | Summary |
+|---------|------|--------|---------|
+| 1.0.0 | ''' + today + ''' | ''' + author + ''' | Initial version |
+
+---
+'''
+
+# Insert after the first H1 line, if present
+h1_match = re.match(r'(#[^#][^\n]*\n)', text)
+if h1_match:
+  insert_pos = h1_match.end()
+  new_text = text[:insert_pos] + version_block + text[insert_pos:]
+else:
+  new_text = version_block.lstrip() + '\n' + text
+
+print(new_text)
+" "$CURRENT_TEXT" "$AUTHOR" "$TODAY")
+
+    ESCAPED=$(echo "$NEW_TEXT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
+    api "documents.update" "{\"id\": \"$ID\", \"title\": $(json_str "$TITLE"), \"text\": $ESCAPED}" \
+      | python3 -c "
+import sys, json
+d = json.load(sys.stdin).get('data', {})
+print(f\"Version 1.0.0 initialized in: [{d.get('id','')}] {d.get('title','')}\")
+"
+    ;;
+
+  version-bump)
+    ID="${1:?Usage: outline.sh version-bump <doc-id> <major|minor|patch> <summary> [author]}"
+    BUMP="${2:?Missing bump type: major|minor|patch}"
+    SUMMARY="${3:?Missing change summary}"
+    AUTHOR="${4:-Unknown}"
+    TODAY=$(date -u +%Y-%m-%d)
+
+    # Fetch doc
+    DOC_JSON=$(api "documents.info" "{\"id\": \"$ID\"}")
+    TITLE=$(echo "$DOC_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('title',''))")
+    CURRENT_TEXT=$(echo "$DOC_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('text',''))")
+
+    NEW_TEXT=$(python3 -c "
+import sys, re
+
+text = sys.argv[1]
+bump = sys.argv[2]
+summary = sys.argv[3]
+author = sys.argv[4]
+today = sys.argv[5]
+
+# Find the version table
+table_pattern = re.compile(
+  r'(##\s+(?:📋\s*)?Document Version History\s*\n+\|[^\n]+\|\n\|[-| :]+\|\n)((?:\|[^\n]+\|\n?)*)',
+  re.IGNORECASE
+)
+match = table_pattern.search(text)
+
+if not match:
+  print('ERROR: No version table found. Run version-init first.', file=sys.stderr)
+  sys.exit(1)
+
+# Find the latest version from existing rows
+rows = match.group(2).strip().splitlines()
+latest = '0.0.0'
+for row in rows:
+  parts = [p.strip() for p in row.strip('|').split('|')]
+  if parts and re.match(r'\d+\.\d+\.\d+', parts[0]):
+    latest = parts[0]
+
+# Parse and bump version
+try:
+  major, minor, patch = map(int, latest.split('.'))
+except:
+  major, minor, patch = 1, 0, 0
+
+if bump == 'major':
+  major += 1; minor = 0; patch = 0
+elif bump == 'minor':
+  minor += 1; patch = 0
+else:
+  patch += 1
+
+new_version = f'{major}.{minor}.{patch}'
+new_row = f'| {new_version} | {today} | {author} | {summary} |'
+
+# Insert new row after the header rows
+def replace_table(m):
+  header = m.group(1)
+  existing_rows = m.group(2)
+  return header + existing_rows + new_row + '\n'
+
+new_text = table_pattern.sub(replace_table, text)
+print(new_text)
+print(f'NEWVERSION:{new_version}', file=sys.stderr)
+" "$CURRENT_TEXT" "$BUMP" "$SUMMARY" "$AUTHOR" "$TODAY" 2>/tmp/outline_version_stderr)
+
+    if [[ $? -ne 0 ]]; then
+      cat /tmp/outline_version_stderr >&2
+      exit 1
+    fi
+
+    NEW_VERSION=$(grep "NEWVERSION:" /tmp/outline_version_stderr | cut -d: -f2)
+    ESCAPED=$(echo "$NEW_TEXT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
+    api "documents.update" "{\"id\": \"$ID\", \"title\": $(json_str "$TITLE"), \"text\": $ESCAPED}" \
+      | python3 -c "
+import sys, json
+d = json.load(sys.stdin).get('data', {})
+print(f\"Version bumped to $NEW_VERSION in: [{d.get('id','')}] {d.get('title','')}\")
+"
+    ;;
+
   # ─── REVISIONS ──────────────────────────────────────────────────────
 
   revisions)
@@ -788,7 +961,13 @@ USERS:
 ACTIVITY:
   events [doc-id] [--limit N] [--name EVENT]  Recent activity/audit log
 
-REVISIONS:
+VERSIONING (document-level changelog):
+  version-history <doc-id>            Show the version table inside a document
+  version-init <doc-id> [author]      Add version table v1.0.0 to an unversioned doc
+  version-bump <doc-id> <major|minor|patch> <summary> [author]
+                                      Increment version and record change in doc
+
+REVISIONS (Outline server-side history):
   revisions <doc-id> [limit]          Revision history
   revision-get <rev-id> <doc-id>      Read a specific revision
 

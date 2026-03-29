@@ -1,6 +1,6 @@
 ---
 name: outline
-description: Read, search, create and update documents in an Outline wiki. Supports full Outline REST API — search, browse, create, update, move, share, comment, star, template, and audit log operations.
+description: Read, search, create and update documents in an Outline wiki. Supports full Outline REST API — search, browse, create, update, move, share, comment, star, template, version, and audit log operations.
 ---
 
 # Outline Wiki Skill
@@ -31,94 +31,86 @@ Connects an OpenClaw agent to any [Outline](https://www.getoutline.com/) wiki in
 
 All commands via: `bash $WORKSPACE/tools/outline/outline.sh <command>`
 
-## Commands Reference
+## Common Commands
 
-### Documents
 ```bash
-outline.sh search <query> [limit]              # Full-text search
-outline.sh search-titles <query> [limit]       # Fast title-only search
-outline.sh get <doc-id>                        # Read document content (markdown)
-outline.sh info <doc-id>                       # Document metadata
-outline.sh list [collection-id]                # List documents
-outline.sh children <parent-doc-id>            # List child documents
-outline.sh drafts [limit]                      # List unpublished drafts
-outline.sh archived [limit]                    # List archived documents
-outline.sh create <title> <coll-id> [file]     # Create document
-outline.sh update <doc-id> <title> [file]      # Update document
-outline.sh move <doc-id> <parent-doc-id>       # Re-parent document
-outline.sh duplicate <doc-id> [new-title]      # Duplicate a document
-outline.sh archive <doc-id>                    # Archive document
-outline.sh delete <doc-id> [--permanent]       # Delete (trash or permanent)
-outline.sh restore <doc-id>                    # Restore from trash
-outline.sh unpublish <doc-id>                  # Revert to draft
-outline.sh backlinks <doc-id>                  # Docs linking to this one
+# Search the wiki
+bash $WORKSPACE/tools/outline/outline.sh search "architecture"
+
+# Read a document (returns full markdown)
+bash $WORKSPACE/tools/outline/outline.sh get <doc-id>
+
+# List all collections
+bash $WORKSPACE/tools/outline/outline.sh collections
+
+# List docs in a collection
+bash $WORKSPACE/tools/outline/outline.sh list <collection-id>
+
+# Create a new document (content from stdin)
+echo "# My Doc\nContent here" | bash $WORKSPACE/tools/outline/outline.sh create "Title" <collection-id>
+
+# Update an existing document
+cat updated.md | bash $WORKSPACE/tools/outline/outline.sh update <doc-id> "New Title"
 ```
 
-### Collections
-```bash
-outline.sh collections                         # List all collections
-outline.sh collection-info <id>                # Collection details
-outline.sh collection-create <name> [desc]     # Create collection
-outline.sh collection-update <id> <name> [desc] # Rename/update
-outline.sh collection-tree <id>                # Full nested document tree
+## Document Versioning
+
+Every important document should carry a version table. This is the standard format:
+
+```markdown
+## 📋 Document Version History
+
+| Version | Date | Author | Summary |
+|---------|------|--------|---------|
+| 1.0.0 | 2026-03-29 | Iris | Initial version |
+| 1.1.0 | 2026-04-01 | Nabil | Added architecture section |
 ```
 
-### Comments
+### Versioning Commands
+
 ```bash
-outline.sh comments <doc-id>                   # List comments
-outline.sh comment-create <doc-id> <text>      # Add comment
+SCRIPT="$WORKSPACE/tools/outline/outline.sh"
+
+# Show version table from a doc
+bash "$SCRIPT" version-history <doc-id>
+
+# Add a version table (v1.0.0) to an unversioned doc
+bash "$SCRIPT" version-init <doc-id> "AuthorName"
+
+# Bump version and record a change
+bash "$SCRIPT" version-bump <doc-id> minor "Added deployment section" "AuthorName"
+bash "$SCRIPT" version-bump <doc-id> patch "Fixed typo" "AuthorName"
+bash "$SCRIPT" version-bump <doc-id> major "Complete rewrite" "AuthorName"
 ```
 
-### Sharing
-```bash
-outline.sh share <doc-id>                      # Create public share link
-outline.sh shares                              # List active shares
-outline.sh unshare <share-id>                  # Revoke share
-```
-
-### Stars / Bookmarks
-```bash
-outline.sh star <doc-id>                       # Star a document
-outline.sh unstar <doc-id>                     # Remove star
-outline.sh starred                             # List starred documents
-```
+### Versioning Rules
+- **`patch`** — typos, clarifications, minor wording fixes (1.0.0 → 1.0.1)
+- **`minor`** — new sections, added content, non-breaking changes (1.0.0 → 1.1.0)
+- **`major`** — full rewrites, structural overhaul, breaking changes (1.0.0 → 2.0.0)
+- The version table lives **inside the document body** — visible to all readers
+- Use `version-init` before `version-bump` on previously unversioned docs
+- Complements Outline's built-in revision history (which tracks every save)
 
 ### Templates
+
 ```bash
-outline.sh templates                           # List templates
-outline.sh template-get <id>                   # Get template content
-outline.sh template-create <title> <coll-id> [file]  # Create template
+# New versioned doc from template
+bash "$SCRIPT" create "My Doc Title" <collection-id> \
+  $WORKSPACE/tools/outline/templates/versioned-document.md
+
+# Team member status file
+bash "$SCRIPT" create "Alice — Status" <collection-id> \
+  $WORKSPACE/tools/outline/templates/team-member-status.md
 ```
 
-### Users & Activity
-```bash
-outline.sh users                               # List workspace users
-outline.sh events [doc-id] [--limit N] [--name EVENT]  # Audit log
-```
+Available templates:
+- `templates/versioned-document.md` — generic versioned document
+- `templates/team-member-status.md` — living team member status file
 
-### Revisions
-```bash
-outline.sh revisions <doc-id> [limit]          # Revision history
-outline.sh revision-get <rev-id> <doc-id>      # Read a specific revision
-```
-
-## Agent Workflow Guidelines
+## Workflow
 
 1. **Search first** — always search before creating to avoid duplicates
-2. **Use `get` for full content** — `search` returns snippets only
-3. **Confirm before writes** — ask before creating/updating unless explicitly told to
-4. **Cache collection IDs** — run `collections` once and reuse IDs
-5. **State files > logs** — for living docs (status pages, etc.), keep as current-truth; Outline versioning handles history
-
-## Templates
-
-| File | Purpose |
-|------|---------|
-| `templates/team-member-status.md` | Living status doc for a team member |
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `OUTLINE_API_KEY` | ✅ | API token from Outline settings |
-| `OUTLINE_API_URL` | ✅ | Base API URL, e.g. `https://wiki.example.com/api` |
+2. **Get full content** — search returns snippets; use `get` for full doc
+3. **Confirm before write** — ask before creating/updating docs unless explicitly told to
+4. **Use collection IDs** — run `collections` once to cache the IDs and names
+5. **Version important docs** — run `version-init` on new docs, `version-bump` on updates
