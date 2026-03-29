@@ -16,7 +16,9 @@ Gives any OpenClaw agent a complete Outline wiki interface via CLI:
 
 **40+ commands** covering the full Outline REST API.
 
-## Quick Install
+## Installation
+
+### OpenClaw
 
 ```bash
 git clone https://github.com/thakaamed/outline-skill.git
@@ -27,11 +29,61 @@ bash scripts/install.sh
 Then edit the generated credentials file with your API key:
 
 ```bash
-# Default path:
 nano /data/openclaw/credentials/outline.env
+# Set: OUTLINE_API_KEY=ol_api_... and OUTLINE_API_URL=https://your-wiki.example.com/api
 ```
 
 Get your API key from: **Outline → Settings → API Tokens**
+
+### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "outline": {
+      "command": "npx",
+      "args": ["-y", "@thakaamed/outline-mcp"],
+      "env": {
+        "OUTLINE_API_KEY": "ol_api_your_token_here",
+        "OUTLINE_API_URL": "https://your-wiki.example.com/api"
+      }
+    }
+  }
+}
+```
+
+Restart Claude Desktop — the Outline tools will appear automatically.
+
+### Claude Code (CLI)
+
+```bash
+claude mcp add outline \
+  --transport stdio \
+  --env OUTLINE_API_KEY=ol_api_your_token_here \
+  --env OUTLINE_API_URL=https://your-wiki.example.com/api \
+  -- npx -y @thakaamed/outline-mcp
+```
+
+Verify: run `claude` then `/mcp` to confirm the `outline` server is listed with 17 tools.
+
+### Any MCP Client (VS Code Copilot, Cursor, Windsurf, etc.)
+
+```json
+{
+  "mcpServers": {
+    "outline": {
+      "command": "npx",
+      "args": ["-y", "@thakaamed/outline-mcp"],
+      "env": {
+        "OUTLINE_API_KEY": "ol_api_your_token_here",
+        "OUTLINE_API_URL": "https://your-wiki.example.com/api"
+      }
+    }
+  }
+}
+```
 
 ## Requirements
 
@@ -63,14 +115,22 @@ Or place the `skills/outline/` folder under your agent's workspace `skills/` dir
 outline-skill/
 ├── SKILL.md                        # OpenClaw skill definition
 ├── README.md                       # This file
+├── package.json                    # npm package (@thakaamed/outline-mcp)
+├── tsconfig.json                   # TypeScript build config
+├── server.json                     # MCP Registry metadata
 ├── .env.example                    # Credentials template
+├── src/
+│   └── index.ts                    # MCP server (17 tools, stdio transport)
+├── build/                          # Compiled JS (generated, gitignored)
 ├── scripts/
-│   ├── outline.sh                  # Main CLI (40+ commands)
-│   └── install.sh                  # One-command installer
+│   ├── outline.sh                  # Main CLI (40+ commands) — shared core
+│   └── install.sh                  # OpenClaw installer
 └── templates/
     ├── versioned-document.md       # Generic versioned doc template
     └── team-member-status.md       # Living status doc template
 ```
+
+**Dual compatibility:** OpenClaw agents use `SKILL.md` + `install.sh` + `outline.sh` directly. Claude Desktop/Code spawn the npm MCP server, which also shells out to `outline.sh`. Same execution core, two install paths — no conflicts.
 
 ## Usage Examples
 

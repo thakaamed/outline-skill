@@ -1,0 +1,37 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.thakaamed/outline",
+  "title": "Outline Wiki",
+  "description": "Search, read, create, update, and manage documents in an Outline wiki instance. Supports 40+ operations including collections, versioning, archiving, comments, shares, and templates.",
+  "repository": {
+    "url": "https://github.com/thakaamed/outline-skill",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@thakaamed/outline-mcp",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "OUTLINE_API_KEY",
+          "description": "Outline API token (Settings → API Tokens in your Outline instance)",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "OUTLINE_API_URL",
+          "description": "Outline API base URL (e.g. https://wiki.example.com/api)",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

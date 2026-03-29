@@ -1,0 +1,48 @@
+{
+  "name": "@thakaamed/outline-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Outline wiki — search, read, create, and manage documents via the Outline REST API",
+  "mcpName": "io.github.thakaamed/outline",
+  "type": "module",
+  "main": "build/index.js",
+  "bin": {
+    "outline-mcp": "./build/index.js"
+  },
+  "files": [
+    "build",
+    "scripts/outline.sh",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsc && node -e \"import('fs').then(fs => fs.chmodSync('build/index.js', '755'))\"",
+    "prepublishOnly": "npm run build",
+    "dev": "tsc --watch",
+    "start": "node build/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thakaamed/outline-skill.git"
+  },
+  "keywords": [
+    "mcp",
+    "outline",
+    "wiki",
+    "knowledge-base",
+    "model-context-protocol",
+    "claude",
+    "ai-tools"
+  ],
+  "author": "ThakaaMed",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

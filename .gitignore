@@ -4,6 +4,17 @@
 outline.env
 credentials/
 
+# Dependencies
+node_modules/
+build/
+dist/
+
+# Build
+dist/
+
+# Logs
+*.log
+
 # OS
 .DS_Store
 *.swp
