@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "outline-wiki": {
+      "command": "npx",
+      "args": ["-y", "@thakaamed/outline-mcp"],
+      "env": {
+        "OUTLINE_API_KEY": "${OUTLINE_API_KEY}",
+        "OUTLINE_API_URL": "${OUTLINE_API_URL}"
+      }
+    }
+  }
+}

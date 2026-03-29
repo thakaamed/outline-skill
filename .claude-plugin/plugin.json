@@ -1,0 +1,17 @@
+{
+  "name": "outline-wiki",
+  "description": "Connect Claude Code to any Outline wiki instance via MCP.",
+  "version": "1.0.0",
+  "author": { "name": "Thakaa Med" },
+  "license": "MIT",
+  "mcpServers": {
+    "outline-wiki": {
+      "command": "npx",
+      "args": ["-y", "@thakaamed/outline-mcp"],
+      "env": {
+        "OUTLINE_API_KEY": "${OUTLINE_API_KEY}",
+        "OUTLINE_API_URL": "${OUTLINE_API_URL}"
+      }
+    }
+  }
+}

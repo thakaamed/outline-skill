@@ -1,0 +1,13 @@
+{
+  "name": "outline-skill",
+  "owner": {
+    "name": "Thakaa Med"
+  },
+  "plugins": [
+    {
+      "name": "outline-wiki",
+      "source": "./",
+      "description": "Connect Claude Code to any Outline wiki instance. Search, create, update, and manage documents via MCP."
+    }
+  ]
+}
