@@ -10,8 +10,8 @@
   },
   "files": [
     "build",
-    "scripts/outline.sh",
-    "templates"
+    "skills/outline/scripts/outline.sh",
+    "skills/outline/templates"
   ],
   "scripts": {
     "build": "tsc && node -e \"import('fs').then(fs => fs.chmodSync('build/index.js', '755'))\"",

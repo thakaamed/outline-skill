@@ -9,8 +9,8 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Resolve outline.sh — works both in dev (../scripts/) and npm install (../scripts/)
-const OUTLINE_SH = resolve(__dirname, "..", "scripts", "outline.sh");
+// Resolve outline.sh — lives inside the skill directory
+const OUTLINE_SH = resolve(__dirname, "..", "skills", "outline", "scripts", "outline.sh");
 
 /**
  * Execute an outline.sh command and return its stdout.

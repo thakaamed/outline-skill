@@ -32,13 +32,13 @@ mkdir -p "$WORKSPACE/tools/outline/templates"
 mkdir -p "$WORKSPACE/skills/outline"
 
 # 2. Install CLI script
-cp "$SCRIPT_DIR/outline.sh" "$WORKSPACE/tools/outline/outline.sh"
+cp "$SKILL_DIR/skills/outline/scripts/outline.sh" "$WORKSPACE/tools/outline/outline.sh"
 chmod +x "$WORKSPACE/tools/outline/outline.sh"
 echo "✅ Installed outline.sh → $WORKSPACE/tools/outline/outline.sh"
 
 # 3. Install templates
-if [[ -d "$SKILL_DIR/templates" ]]; then
-  cp -r "$SKILL_DIR/templates/"* "$WORKSPACE/tools/outline/templates/" 2>/dev/null || true
+if [[ -d "$SKILL_DIR/skills/outline/templates" ]]; then
+  cp -r "$SKILL_DIR/skills/outline/templates/"* "$WORKSPACE/tools/outline/templates/" 2>/dev/null || true
   echo "✅ Installed templates → $WORKSPACE/tools/outline/templates/"
 fi
 
