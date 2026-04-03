@@ -39,13 +39,6 @@ if [[ "$COMMAND" != "help" ]]; then
   fi
 
   # 2. Environment variables (already set if exported)
-  #    Also extract from .bashrc/.profile if not set (non-interactive shells skip .bashrc)
-  if [[ -z "${OUTLINE_API_KEY:-}" && -f "$HOME/.bashrc" ]]; then
-    eval "$(grep -E '^export OUTLINE_(API_KEY|API_URL)=' "$HOME/.bashrc" 2>/dev/null)" || true
-  fi
-  if [[ -z "${OUTLINE_API_KEY:-}" && -f "$HOME/.profile" ]]; then
-    eval "$(grep -E '^export OUTLINE_(API_KEY|API_URL)=' "$HOME/.profile" 2>/dev/null)" || true
-  fi
 
   # 3. Config file fallback
   if [[ -z "${OUTLINE_API_KEY:-}" && -f "$HOME/.config/outline/.env" ]]; then

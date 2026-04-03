@@ -1,6 +1,6 @@
 {
   "name": "@thakaamed/outline-mcp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "MCP server for Outline wiki — search, read, create, and manage documents via the Outline REST API",
   "mcpName": "io.github.thakaamed/outline",
   "type": "module",
