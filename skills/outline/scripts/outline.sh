@@ -6,17 +6,57 @@
 
 set -euo pipefail
 
-# Load credentials if not already in env
-CREDS_FILE="/data/openclaw/credentials/outline.env"
-if [[ -z "${OUTLINE_API_KEY:-}" ]] && [[ -f "$CREDS_FILE" ]]; then
-  source "$CREDS_FILE"
-fi
-
-: "${OUTLINE_API_KEY:?OUTLINE_API_KEY not set. Add to $CREDS_FILE or export it.}"
-: "${OUTLINE_API_URL:?OUTLINE_API_URL not set. Add to $CREDS_FILE or export it.}"
-
+# ─── Credential Loading ──────────────────────────────────────────────
 COMMAND="${1:-help}"
 shift || true
+
+# Skip credential loading for help
+if [[ "$COMMAND" != "help" ]]; then
+  # Resolution order: 1) Vault  2) Environment  3) Config file  4) Creds file
+  CREDS_FILE="/data/openclaw/credentials/outline.env"
+
+  # 1. Try vault (Bitwarden/Vaultwarden)
+  KEYRING="/data/openclaw/credentials/vault-keyring.env"
+  if [[ -z "${OUTLINE_API_KEY:-}" && -f "$KEYRING" ]]; then
+    # shellcheck source=/dev/null
+    source "$KEYRING"
+    BW_SERVER="${BW_SERVER:-https://openclaw-ragab.tail03827.ts.net:8585}"
+    bw config server "$BW_SERVER" > /dev/null 2>&1 || true
+    bw login --apikey > /dev/null 2>&1 || true
+    _bw_session=$(timeout 10 bw unlock --passwordenv BW_PASSWORD --raw 2>/dev/null) || true
+    if [[ -n "${_bw_session:-}" ]]; then
+      _outline_token=$(bw list items --search "outline-api-key" --session "$_bw_session" 2>/dev/null | \
+        python3 -c "import json,sys; items=json.load(sys.stdin); \
+        [print(f['value']) for i in items for f in i.get('fields',[]) if f.get('name')=='api-key']" 2>/dev/null) || true
+      _outline_url=$(bw list items --search "outline-api-key" --session "$_bw_session" 2>/dev/null | \
+        python3 -c "import json,sys; items=json.load(sys.stdin); \
+        [print(f['value']) for i in items for f in i.get('fields',[]) if f.get('name')=='api-url']" 2>/dev/null) || true
+      bw lock > /dev/null 2>&1 || true
+      [[ -n "${_outline_token:-}" ]] && OUTLINE_API_KEY="$_outline_token"
+      [[ -n "${_outline_url:-}" ]] && OUTLINE_API_URL="$_outline_url"
+    fi
+    unset BW_CLIENTID BW_CLIENTSECRET BW_PASSWORD _bw_session _outline_token _outline_url 2>/dev/null || true
+  fi
+
+  # 2. Environment variables (already set if exported)
+
+  # 3. Config file fallback
+  if [[ -z "${OUTLINE_API_KEY:-}" && -f "$HOME/.config/outline/.env" ]]; then
+    # shellcheck source=/dev/null
+    source "$HOME/.config/outline/.env"
+  fi
+
+  # 4. Creds file fallback
+  if [[ -z "${OUTLINE_API_KEY:-}" && -f "$CREDS_FILE" ]]; then
+    # shellcheck source=/dev/null
+    source "$CREDS_FILE"
+  fi
+
+  : "${OUTLINE_API_KEY:?not set. Add to ${CREDS_FILE:-/data/openclaw/credentials/outline.env}, $HOME/.config/outline/.env, or export it.}"
+  : "${OUTLINE_API_URL:?not set. Add to ${CREDS_FILE:-/data/openclaw/credentials/outline.env}, $HOME/.config/outline/.env, or export it.}"
+
+  BASE_URL="${OUTLINE_API_URL%/api}"
+fi
 
 # JSON-encode a string safely
 json_str() {
@@ -116,7 +156,7 @@ print(f\"Created: {d.get('createdAt','')[:19]}\")
 print(f\"Updated: {d.get('updatedAt','')[:19]}\")
 print(f\"Collection: {d.get('collectionId','')}\")
 print(f\"Parent: {d.get('parentDocumentId','')}\")
-print(f\"URL: https://your-wiki.example.com{d.get('url','')}\")
+print(f\"URL: $BASE_URL{d.get('url','')}\")
 "
     ;;
 
@@ -239,7 +279,7 @@ print(f\"Archived: [{d.get('id','')}] {d.get('title','')}\")
         | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
-print(f'Permanently deleted: {\"$ID\"}')" 
+print(f\"Permanently deleted: $ID\")"
     else
       api "documents.delete" "{\"id\": \"$ID\"}" \
         | python3 -c "
@@ -386,13 +426,15 @@ def extract_text(data):
   '''Extract plain text from ProseMirror JSON.'''
   if isinstance(data, str):
     return data
+  if isinstance(data, list):
+    return ' '.join(extract_text(item) for item in data)
   if isinstance(data, dict):
     if data.get('type') == 'text':
       return data.get('text', '')
     parts = []
     for child in data.get('content', []):
       parts.append(extract_text(child))
-    return ' '.join(parts)
+    return ''.join(parts)
   return ''
 
 d = json.load(sys.stdin)
@@ -406,7 +448,8 @@ else:
     text = extract_text(c.get('data', {})).strip()
     resolved = ' [RESOLVED]' if c.get('resolvedAt') else ''
     print(f\"[{c.get('id','')}] {user} ({date}){resolved}\")
-    print(f\"  {text[:300]}\")
+    truncated = ' [...]' if len(text) > 300 else ''
+    print(f\"  {text[:300]}{truncated}\")
     print()
 "
     ;;
@@ -804,6 +847,7 @@ print(f\"Version 1.0.0 initialized in: [{d.get('id','')}] {d.get('title','')}\")
     TITLE=$(echo "$DOC_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('title',''))")
     CURRENT_TEXT=$(echo "$DOC_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('text',''))")
 
+    _stderr_file=$(mktemp)
     NEW_TEXT=$(python3 -c "
 import sys, re
 
@@ -857,14 +901,16 @@ def replace_table(m):
 new_text = table_pattern.sub(replace_table, text)
 print(new_text)
 print(f'NEWVERSION:{new_version}', file=sys.stderr)
-" "$CURRENT_TEXT" "$BUMP" "$SUMMARY" "$AUTHOR" "$TODAY" 2>/tmp/outline_version_stderr)
+" "$CURRENT_TEXT" "$BUMP" "$SUMMARY" "$AUTHOR" "$TODAY" 2>"$_stderr_file")
 
     if [[ $? -ne 0 ]]; then
-      cat /tmp/outline_version_stderr >&2
+      cat "$_stderr_file" >&2
+      rm -f "$_stderr_file"
       exit 1
     fi
 
-    NEW_VERSION=$(grep "NEWVERSION:" /tmp/outline_version_stderr | cut -d: -f2)
+    NEW_VERSION=$(grep "NEWVERSION:" "$_stderr_file" | cut -d: -f2)
+    rm -f "$_stderr_file"
     ESCAPED=$(echo "$NEW_TEXT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
     api "documents.update" "{\"id\": \"$ID\", \"title\": $(json_str "$TITLE"), \"text\": $ESCAPED}" \
       | python3 -c "
